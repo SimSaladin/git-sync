@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 GIT_SYNC_DIRECTORY="${GIT_SYNC_DIRECTORY:-$(pwd)}"
 GIT_SYNC_COMMAND="${GIT_SYNC_COMMAND:-git-sync}"
+GIT_SYNC_NEW_FILES="${GIT_SYNC_NEW_FILES:-true}"
+GIT_SYNC_DONT_AUTOCOMMIT="${GIT_SYNC_DONT_AUTOCOMMIT-}"
 GIT_SYNC_INTERVAL="${GIT_SYNC_INTERVAL:-500}"
+GIT_SYNC_DELAY="${GIT_SYNC_DELAY:-5}"
 
 # Initialize the directory
 if [ ! -d  "$GIT_SYNC_DIRECTORY" ]; then
@@ -28,7 +31,7 @@ cd "$GIT_SYNC_DIRECTORY"
 remote_name=$(git config --get branch.$(basename $(git symbolic-ref -q HEAD)).pushRemote)
 echo "Syncing $(git remote get-url $remote_name) at $(pwd) with a default sync interval of $GIT_SYNC_INTERVAL"
 
-$GIT_SYNC_COMMAND -n -s
+$GIT_SYNC_COMMAND ${GIT_SYNC_NEW_FILES:+-n} ${GIT_SYNC_DONT_AUTOCOMMIT+-C} -s
 
 while true; do
 	changedFile=$(
@@ -38,9 +41,12 @@ while true; do
 	if [ -z "$changedFile" ]
 	then
 		echo "Syncing due to timeout"
-		$GIT_SYNC_COMMAND -n -s
-	else
-		echo "Syncing for: $changedFile"
-		{ git check-ignore "$changedFile" > /dev/null; } || $GIT_SYNC_COMMAND -n -s
+    elif git check-ignore "$changedFile" > /dev/null
+    then
+        : # ignore changes on ignored files
+    else
+        echo "Syncing for: $changedFile (delay: $GIT_SYNC_DELAY seconds)"
+        sleep "$GIT_SYNC_DELAY"
 	fi
+	$GIT_SYNC_COMMAND ${GIT_SYNC_NEW_FILES:+-n} ${GIT_SYNC_DONT_AUTOCOMMIT+-C} -s
 done

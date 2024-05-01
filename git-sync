@@ -34,10 +34,10 @@
 # that syncing is at all likely to succeed.
 
 # command used to auto-commit file modifications
-DEFAULT_AUTOCOMMIT_CMD="git add -u ; git commit -m \"%message\";"
+DEFAULT_AUTOCOMMIT_CMD=${GIT_SYNC_DEFAULT_AUTOCOMMIT_CMD:-"git add -u ; git commit -m \"%message\";"}
 
 # command used to auto-commit all changes
-ALL_AUTOCOMMIT_CMD="git add -A ; git commit -m \"%message\";"
+ALL_AUTOCOMMIT_CMD=${GIT_SYNC_ALL_AUTOCOMMIT_CMD:-"git add -A ; git commit -m \"%message\";"}
 
 # default commit message substituted into autocommit commands
 DEFAULT_AUTOCOMMIT_MSG="changes from $(uname -n) on $(date)"
@@ -48,25 +48,30 @@ DEFAULT_AUTOCOMMIT_MSG="changes from $(uname -n) on $(date)"
 
 print_usage() {
     cat << EOF
-usage: $0 [-h] [-n] [-s] [MODE]
+usage: $0 [-h] [-n] [-s] [-C] [MODE]
 
 Synchronize the current branch to a remote backup
 MODE may be either "sync" (the default) or "check", to verify that the branch is ready to sync
 
 OPTIONS:
    -h      Show this message
+   -C      Do not commit changes automatically
    -n      Commit new files even if branch.\$branch_name.syncNewFiles isn't set
    -s      Sync the branch even if branch.\$branch_name.sync isn't set
 EOF
 }
+autocommit_changes="true"
 sync_new_files_anyway="false"
 sync_anyway="false"
 
-while getopts "hns" opt ; do
+while getopts "hCns" opt ; do
     case $opt in
         h )
             print_usage
             exit 0
+            ;;
+        C )
+            autocommit_changes="false"
             ;;
         n )
             sync_new_files_anyway="true"
@@ -302,6 +307,10 @@ fi
 
 # check if we have to commit local changes, if yes, do so
 if [ ! -z "$(local_changes)" ]; then
+    if [[ "true" != "$autocommit_changes" ]]; then
+        echo "Auto-commit is disabled. Please commit or stash pending changes."
+        exit 1
+    fi
     autocommit_cmd=""
     config_autocommit_cmd="$(git config --get branch.$branch_name.autocommitscript)"
 
